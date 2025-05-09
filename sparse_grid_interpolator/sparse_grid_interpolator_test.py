@@ -1,50 +1,69 @@
-from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 import matplotlib.pyplot as plt
+from sklearn.metrics import (
+    mean_squared_error, mean_absolute_error,
+    max_error, r2_score
+)
 from sparse_grid_interpolator import SparseGridInterpolator
 
 def test_function(points):
     """Тестовая 2D функция для интерполяции."""
-    result = ((
-        0.5 / np.pi * points[:, 0] -
-        0.51 / (0.4 * np.pi ** 2) * points[:, 0] ** 2 +
-        points[:, 1] - 0.6) ** 2 +
-        (1 - 1 / (0.8 * np.pi)) * np.cos(points[:, 0]) + 0.10)
+    result = np.cos(points[:, 0] ** 2) + np.sin(points[:, 1] ** 2)
     return result
+
+def mape(y_true, y_pred):
+    """Средняя абсолютная процентная ошибка."""
+    return np.mean(np.abs((y_true - y_pred) / (y_true + 1e-10))) * 100
 
 if __name__ == '__main__':
     dim_count = 2
     max_level = 6
-    grid_shape = (grid_x, grid_y) = (21, 21)
-    total_points = grid_x * grid_y
 
-    x_vals = np.linspace(0, 1, grid_x)
-    y_vals = np.linspace(0, 1, grid_y)
-    X, Y = np.meshgrid(x_vals, y_vals)
-    eval_grid = np.array([X.ravel(), Y.ravel()]).T
+    train_grid = np.random.rand(50, dim_count)
+    test_grid = np.random.rand(1000, dim_count)
 
-    interp_bounds = np.array([[0.0, 1.0], [0.0, 1.0]]).T
+    interp_bounds = np.array([[-2.0, 2.1], [-2.0, 2.1]]).T
     target_func = test_function
 
     interpolator = SparseGridInterpolator(max_level, dim_count, interp_bounds)
-    interp_vals = interpolator.train(target_func, eval_grid)
-    predicted_vals = interpolator.predict(eval_grid)
-    print(np.ptp(interp_vals - predicted_vals))
+    interpolator.train(target_func, train_grid)
 
-    true_vals = target_func(eval_grid).reshape(grid_shape)
-    interp_vals = interp_vals.reshape(grid_shape)
+    true_vals = target_func(test_grid)
+    predicted_vals = interpolator.predict(test_grid)
+    errors = predicted_vals - true_vals
 
-    fig = plt.figure(figsize=(16, 6))
+    # Метрики
+    mse = mean_squared_error(true_vals, predicted_vals)
+    rmse = np.sqrt(mse)
+    mae = mean_absolute_error(true_vals, predicted_vals)
+    me = max_error(true_vals, predicted_vals)
+    mape_val = mape(true_vals, predicted_vals)
+    r2 = r2_score(true_vals, predicted_vals)
 
-    ax = fig.add_subplot(131, projection='3d', title="Исходные значения")
-    ax.plot_surface(X, Y, true_vals, rstride=1, cstride=1, cmap=plt.cm.magma)
+    print(f"Обучающих точек: {len(train_grid)}")
+    print(f"Тестовых точек:  {len(test_grid)}\n")
+    print(f"MSE   (Mean Squared Error):           {mse:.6e}")
+    print(f"RMSE  (Root Mean Squared Error):      {rmse:.6e}")
+    print(f"MAE   (Mean Absolute Error):          {mae:.6e}")
+    print(f"ME    (Max Absolute Error):           {me:.6e}")
+    print(f"MAPE  (Mean Absolute Percentage Err): {mape_val:.2f} %")
+    print(f"R²    (Coefficient of Determination): {r2:.6f}")
 
-    ax = fig.add_subplot(132, projection='3d', title="Интерполированные значения")
-    ax.plot_surface(X, Y, interp_vals, rstride=1, cstride=1, cmap=plt.cm.magma)
+    # Визуализация в столбец
+    fig = plt.figure(figsize=(8, 12))
 
-    ax = fig.add_subplot(133, projection='3d', title="Ошибка интерполяции")
-    ax.plot_surface(X, Y, interp_vals - true_vals, rstride=1, cstride=1, cmap=plt.cm.magma)
-    ax.set_zlim(0.0, ax.get_zlim()[1] * 2)
+    ax1 = fig.add_subplot(311, projection='3d')
+    ax1.set_title("Истинные значения")
+    ax1.plot_trisurf(test_grid[:, 0], test_grid[:, 1], true_vals, cmap='viridis')
+
+    ax2 = fig.add_subplot(312, projection='3d')
+    ax2.set_title("Интерполированные значения")
+    ax2.plot_trisurf(test_grid[:, 0], test_grid[:, 1], predicted_vals, cmap='viridis')
+
+    ax3 = fig.add_subplot(313, projection='3d')
+    ax3.set_title("Ошибка интерполяции")
+    ax3.plot_trisurf(test_grid[:, 0], test_grid[:, 1], errors, cmap='inferno')
+    ax3.set_zlim(0.0, np.max(np.abs(errors)) * 2)
 
     plt.tight_layout()
     plt.show()

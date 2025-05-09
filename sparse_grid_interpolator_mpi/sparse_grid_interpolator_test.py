@@ -2,6 +2,7 @@ from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 import matplotlib.pyplot as plt
 from sparse_grid_interpolator import SparseGridInterpolator
+from chebyshev_interpolation import *
 
 def test_function(points):
     """Тестовая 2D функция для интерполяции."""
@@ -12,7 +13,15 @@ def test_function(points):
         (1 - 1 / (0.8 * np.pi)) * np.cos(points[:, 0]) + 0.10)
     return result
 
-if __name__ == '__main__':
+def main():
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+
+    wrapper = MPIChebyshevInterpolationWrapper()
+
+    if rank != 0:
+        wrapper.worker_loop()
+        return
     dim_count = 2
     max_level = 6
     grid_shape = (grid_x, grid_y) = (21, 21)
@@ -29,6 +38,7 @@ if __name__ == '__main__':
     interpolator = SparseGridInterpolator(max_level, dim_count, interp_bounds)
     interp_vals = interpolator.train(target_func, eval_grid)
     predicted_vals = interpolator.predict(eval_grid)
+    MPIChebyshevInterpolationWrapper().stop_workers()
     print(np.ptp(interp_vals - predicted_vals))
 
     true_vals = target_func(eval_grid).reshape(grid_shape)
@@ -48,3 +58,7 @@ if __name__ == '__main__':
 
     plt.tight_layout()
     plt.show()
+
+if __name__ == '__main__':
+    main()
+    

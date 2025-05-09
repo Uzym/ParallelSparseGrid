@@ -66,9 +66,10 @@ class SparseGridInterpolator:
             residuals = deepcopy(func_vals)
 
             if level > 0:
-                if self._should_stop(self.grids[level - 1]['max_error']):
+                if self.grids[level - 1]['max_error'] < self.tolerance:
                     return result
                 for prev_level in range(level):
+                    
                     prev_grid = self.grids[prev_level]
                     interp_vals = self._interpolate_sparse(
                         self.dimensions,

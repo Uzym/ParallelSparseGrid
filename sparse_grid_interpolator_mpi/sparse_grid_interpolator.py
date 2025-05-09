@@ -35,10 +35,6 @@ class SparseGridInterpolator:
             nodes[:, dim] = nodes[:, dim] * span + bounds[0]
         return nodes
 
-    def _should_stop(self, max_err):
-        """Проверяет, достигнута ли максимальная ошибка критерия ранней остановки."""
-        return max_err < self.tolerance
-
     def train(self, target_func, eval_points):
         """Выполняет n-мерную интерполяцию на разреженной сетке.
 
@@ -66,9 +62,10 @@ class SparseGridInterpolator:
             residuals = deepcopy(func_vals)
 
             if level > 0:
-                if self._should_stop(self.grids[level - 1]['max_error']):
+                if self.grids[level - 1]['max_error'] < self.tolerance:
                     return result
                 for prev_level in range(level):
+                    
                     prev_grid = self.grids[prev_level]
                     interp_vals = self._interpolate_sparse(
                         self.dimensions,
@@ -203,8 +200,9 @@ class SparseGridInterpolator:
         if result is None:
             result = np.zeros(output_size, dtype=float)
 
-        compute_chebyshev_poly(
-            dimensions, result, residuals, output_size,
+        MPIChebyshevInterpolationWrapper().run(
+            result, dimensions, residuals, output_size,
             node_counts, indices, output_nodes, input_nodes, interp_range
         )
+        
         return result
